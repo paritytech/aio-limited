@@ -23,7 +23,7 @@ use std::fmt;
 pub mod bucket;
 
 /// An opaque ID used for registration purposes.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Id(usize);
 
 impl fmt::Display for Id {
