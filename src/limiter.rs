@@ -102,38 +102,41 @@ mod tests {
 	use log::LevelFilter;
 	use std::{str, thread};
 	use limited::Limited;
+	use std::{cmp::max, io};
 	use super::*;
 	use tokio::{
 		self,
 		io::{copy, read_exact},
 		net::{TcpListener, TcpStream},
-		runtime::Runtime
+		runtime::Runtime,
+		timer::Delay
 	};
 
-	const ADDRESS: &str = "127.0.0.1:12345";
-
-	fn echo_server(lr: Limiter, lw: Limiter) -> Box<Future<Item=(), Error=()> + Send> {
-		let srv = TcpListener::bind(&ADDRESS.parse().unwrap()).unwrap()
+	fn echo_server(addr: &str, lr: Option<Limiter>, lw: Limiter) -> Box<Future<Item=(), Error=()> + Send> {
+		let srv = TcpListener::bind(&addr.parse().unwrap()).unwrap()
 			.incoming()
 			.map_err(|e| {
-				eprintln!("accept failed = {:?}", e)
+				error!("accept failed = {:?}", e)
 			})
 			.for_each(move |s| {
 				let (r, w) = s.split();
-				let reader = Limited::new(r, lr.clone()).unwrap();
+				let reader = match lr {
+					Some(ref lim) => Box::new(Limited::new(r, lim.clone()).unwrap()) as Box<AsyncRead + Send>,
+					None => Box::new(r) as Box<AsyncRead + Send>
+				};
 				let writer = Limited::new(w, lw.clone()).unwrap();
 				let future = copy(reader, writer)
-					.map(|_| ()) // TODO: print transfer rate
+					.map(|_| ())
 					.map_err(|e| {
-						eprintln!("copy failed = {:?}", e)
+						error!("copy failed = {:?}", e)
 					});
 				tokio::spawn(future)
 			});
 		Box::new(srv)
 	}
 
-	fn echo_client() -> Box<Future<Item=(), Error=()> + Send> {
-		let clt = TcpStream::connect(&ADDRESS.parse().unwrap())
+	fn echo_client(addr: &str) -> Box<Future<Item=(), Error=()> + Send> {
+		let clt = TcpStream::connect(&addr.parse().unwrap())
 			.and_then(|stream| {
 				copy(&b"0123456789"[..], stream)
 			})
@@ -141,10 +144,35 @@ mod tests {
 				read_exact(stream, vec![0; n as usize])
 			})
 			.map(|(_stream, buf)| {
-				println!("{:?}", str::from_utf8(&buf))
+				info!("{:?}", str::from_utf8(&buf))
 			})
 			.map_err(|e| {
-				eprintln!("client error: {:?}", e)
+				error!("client error: {:?}", e)
+			});
+		Box::new(clt)
+	}
+
+	fn echo_rate_client(addr: &str, size: usize) -> Box<Future<Item=(), Error=()> + Send> {
+		let clt = TcpStream::connect(&addr.parse().unwrap())
+			.and_then(move |stream| {
+				Delay::new(Instant::now() + Duration::from_secs(1)).then(|_| Ok(stream))
+			})
+			.and_then(move |stream| {
+				copy(io::repeat(1).take(size as u64), stream)
+					.and_then(move |(_, _, stream)| {
+						let t = Instant::now();
+						read_exact(stream, vec![0; size]).map(move |(_stream, buf)| (buf, t))
+					})
+					.and_then(move |(buf, t)| {
+						assert_eq!(size, buf.len());
+						let delta = Instant::now().duration_since(t);
+						let read_rate = size as f64 / max(1, delta.as_secs()) as f64;
+						info!("duration = {} s, r = {:.3} b/s", delta.as_secs(), read_rate);
+						Ok(())
+					})
+			})
+			.map_err(|e| {
+				error!("client error: {:?}", e)
 			});
 		Box::new(clt)
 	}
@@ -158,23 +186,60 @@ mod tests {
 		let mut rt = Runtime::new().unwrap();
 		let mut ex = rt.executor();
 
-		let read_limiter = Limiter::new(&mut ex, 100).unwrap();
-		let read_limiter2 = read_limiter.clone();
-
-		let write_limiter = Limiter::new(&mut ex, 100).unwrap();
-		let write_limiter2 = write_limiter.clone();
+		let num_clients = 30;
+		let rate = 100;
+		let read_limiter = Limiter::new(&mut ex, rate).unwrap();
+		let write_limiter = Limiter::new(&mut ex, rate).unwrap();
 
 		thread::spawn(move || {
-			ex.spawn(echo_server(read_limiter2, write_limiter2))
+			ex.spawn(echo_server("127.0.0.1:12345", Some(read_limiter), write_limiter))
 		});
 
 		thread::sleep(Duration::from_secs(1));
 
-		for _ in 0 .. 100 {
-			rt.spawn(echo_client());
+		for _ in 0 .. num_clients {
+			rt.spawn(echo_client("127.0.0.1:12345"));
 		}
 
-		thread::sleep(Duration::from_secs(30));
+		thread::sleep(Duration::from_secs((3 + 10 * num_clients / rate) as u64));
+		rt.shutdown_now().wait().unwrap()
+	}
+
+	#[test]
+	fn test2() {
+		let _ = env_logger::Builder::from_default_env()
+			.filter(None, LevelFilter::Info)
+			.try_init();
+
+		let mut rt = Runtime::new().unwrap();
+		let mut ex = rt.executor();
+
+		let data_size = 10_000;
+		let num_clients = 30;
+		let srv_write_rate = 10_000;
+		let srv_write_lim = Limiter::new(&mut ex, srv_write_rate).unwrap();
+
+		thread::spawn(move || {
+			ex.spawn(echo_server("127.0.0.1:23456", None, srv_write_lim))
+		});
+
+		thread::sleep(Duration::from_secs(1));
+
+		info!("spawning {} clients, data size = {} b, duration = {} s",
+			num_clients,
+			data_size,
+			data_size * num_clients / srv_write_rate);
+
+		for _ in 0 .. num_clients {
+			rt.spawn(echo_rate_client("127.0.0.1:23456", data_size));
+		}
+
+		thread::sleep(Duration::from_secs((3 + data_size * num_clients / srv_write_rate) as u64));
+
+		info!("spawn 1 more client, data size = {} b, duration = {} s", data_size, data_size / srv_write_rate);
+		rt.spawn(echo_rate_client("127.0.0.1:23456", data_size));
+		thread::sleep(Duration::from_secs((3 + data_size / srv_write_rate) as u64));
+
 		rt.shutdown_now().wait().unwrap()
 	}
 }
