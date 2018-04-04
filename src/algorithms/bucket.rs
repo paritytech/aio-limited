@@ -20,7 +20,10 @@
 
 use error::{Error, Result};
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+	cmp::min,
+	sync::atomic::{AtomicUsize, Ordering}
+};
 use super::{Id, Token};
 
 /// A bucket has a certain capacity which is made available as `Token`s
@@ -60,7 +63,7 @@ impl Bucket {
 
 	/// Get a `Token` which contains as quantity the number of items of
 	/// the remaining capacity divided by parts.
-	pub fn get(&self, id: Id) -> Result<Token> {
+	pub fn get(&self, id: Id, hint: usize) -> Result<Token> {
 		let mut cap = self.capacity.lock();
 
 		// no parts => always at full capacity
@@ -71,10 +74,10 @@ impl Bucket {
 		let quant =
 			match cap.value / cap.parts {
 				0 if cap.value > 0 => 1,
-				x => x,
+				x => min(x, hint),
 			};
 
-		trace!("{}: {:?}, quantity = {}", id.0, *cap, quant);
+		trace!("{}: {:?}, hint = {}, quantity = {}", id.0, *cap, hint, quant);
 
 		if quant == 0 {
 			return Err(Error::NoCapacity)

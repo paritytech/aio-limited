@@ -50,7 +50,7 @@ impl Limiter {
 	/// maximum of bytes per second.
 	pub fn new<E: Executor>(e: &mut E, max: usize) -> Result<Limiter> {
 		let bucket = Arc::new(Bucket::new(max));
-		let clock = Arc::new(AtomicUsize::new(1));
+		let clock = Arc::new(AtomicUsize::new(0));
 		let tasks = Arc::new(Mutex::new(HashMap::<Id, Task>::new()));
 		e.spawn(Limiter::timer(clock, bucket.clone(), tasks.clone())?)?;
 		Ok(Limiter { bucket, tasks })
@@ -73,8 +73,8 @@ impl Limiter {
 		Ok(Box::new(i))
 	}
 
-	pub(crate) fn get(&self, id: Id) -> Result<Token> {
-		self.bucket.get(id)
+	pub(crate) fn get(&self, id: Id, hint: usize) -> Result<Token> {
+		self.bucket.get(id, hint)
 	}
 
 	pub(crate) fn release(&self, t: Token) {
