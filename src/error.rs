@@ -24,19 +24,19 @@ use tokio::executor::SpawnError;
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 quick_error! {
-	#[derive(Debug)]
-	pub enum Error {
-		Io(e: io::Error) {
-			cause(e)
-			display("i/o error: {}", e)
-			from()
-		}
-		Exec(e: SpawnError) {
-			display("spawn error: {:?}", e)
-			from()
-		}
-		NoCapacity {
-			description("no capacitty left")
-		}
-	}
+    #[derive(Debug)]
+    pub enum Error {
+        Io(e: io::Error) {
+            cause(e)
+            display("i/o error: {}", e)
+            from()
+        }
+        Exec(e: SpawnError) {
+            display("spawn error: {:?}", e)
+            from()
+        }
+        NoCapacity {
+            description("no capacitty left")
+        }
+    }
 }

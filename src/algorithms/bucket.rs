@@ -20,10 +20,8 @@
 
 use error::{Error, Result};
 use parking_lot::Mutex;
-use std::{
-	cmp::min,
-	sync::atomic::{AtomicUsize, Ordering}
-};
+use std::cmp::min;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use super::{Id, Token};
 
 /// A bucket has a certain capacity which is made available as `Token`s
@@ -39,89 +37,97 @@ use super::{Id, Token};
 /// TODO: In order to avoid continuous slowdown in the rate limiter itself,
 /// track usage per part and remove stale parts if necessary.
 pub struct Bucket {
-	maximum: usize, // maximum capacity
-	idgen: AtomicUsize, // id generator
-	capacity: Mutex<Capacity>,
+    maximum: usize,     // maximum capacity
+    idgen: AtomicUsize, // id generator
+    capacity: Mutex<Capacity>,
 }
 
 #[derive(Debug)]
 struct Capacity {
-	index: usize, // time index
-	value: usize, // capacity value
-	parts: usize, // parts over which to spread the available capacity
+    index: usize, // time index
+    value: usize, // capacity value
+    parts: usize, // parts over which to spread the available capacity
 }
 
 impl Bucket {
-	/// Create a new bucket with the given maximum capacity.
-	pub fn new(capacity: usize) -> Bucket {
-		Bucket {
-			maximum: capacity,
-			idgen: AtomicUsize::new(1),
-			capacity: Mutex::new(Capacity {index: 0, value: capacity, parts: 0 }),
-		}
-	}
+    /// Create a new bucket with the given maximum capacity.
+    pub fn new(capacity: usize) -> Bucket {
+        Bucket {
+            maximum: capacity,
+            idgen: AtomicUsize::new(1),
+            capacity: Mutex::new(Capacity {
+                index: 0,
+                value: capacity,
+                parts: 0,
+            }),
+        }
+    }
 
-	/// Get a `Token` which contains as quantity the number of items of
-	/// the remaining capacity divided by parts.
-	pub fn get(&self, id: Id, hint: usize) -> Result<Token> {
-		let mut cap = self.capacity.lock();
+    /// Get a `Token` which contains as quantity the number of items of
+    /// the remaining capacity divided by parts.
+    pub fn get(&self, id: Id, hint: usize) -> Result<Token> {
+        let mut cap = self.capacity.lock();
 
-		// no parts => always at full capacity
-		if cap.parts == 0 {
-			return Ok(Token::new(cap.index, self.maximum))
-		}
+        // no parts => always at full capacity
+        if cap.parts == 0 {
+            return Ok(Token::new(cap.index, self.maximum));
+        }
 
-		let quant =
-			match cap.value / cap.parts {
-				0 if cap.value > 0 => 1,
-				x => min(x, hint),
-			};
+        let quant = match cap.value / cap.parts {
+            0 if cap.value > 0 => 1,
+            x => min(x, hint),
+        };
 
-		trace!("{}: {:?}, hint = {}, quantity = {}", id.0, *cap, hint, quant);
+        trace!(
+            "{}: {:?}, hint = {}, quantity = {}",
+            id.0,
+            *cap,
+            hint,
+            quant
+        );
 
-		if quant == 0 {
-			return Err(Error::NoCapacity)
-		}
+        if quant == 0 {
+            return Err(Error::NoCapacity);
+        }
 
-		cap.value -= quant;
-		let t = Token::new(cap.index, quant);
-		cap.unlock_fair();
-		Ok(t)
-	}
+        cap.value -= quant;
+        let t = Token::new(cap.index, quant);
+        cap.unlock_fair();
+        Ok(t)
+    }
 
-	/// Give back the reviously retrieved `Token` which increases available
-	/// capacity. Tokens which have expired will not be considered.
-	pub fn release(&self, t: Token) {
-		let mut cap = self.capacity.lock();
-		if t.index == cap.index {
-			cap.value += t.get()
-		}
-	}
+    /// Give back the reviously retrieved `Token` which increases available
+    /// capacity. Tokens which have expired will not be considered.
+    pub fn release(&self, t: Token) {
+        let mut cap = self.capacity.lock();
+        if t.index == cap.index {
+            cap.value += t.get()
+        }
+    }
 
-	/// Reset the time index and make the maximum capacity available again.
-	pub fn reset(&self, i: usize) {
-		let mut cap = self.capacity.lock();
-		cap.index = i;
-		cap.value = self.maximum
-	}
+    /// Reset the time index and make the maximum capacity available again.
+    pub fn reset(&self, i: usize) {
+        let mut cap = self.capacity.lock();
+        cap.index = i;
+        cap.value = self.maximum
+    }
 
-	/// Attempt to increase the number of parts by one.
-	/// This can fail if it would result in more parts than the maximum capacity.
-	pub fn add_part(&self) -> Result<Id> {
-		let mut cap = self.capacity.lock();
-		if cap.parts >= self.maximum {
-			return Err(Error::NoCapacity)
-		}
-		cap.parts += 1;
-		Ok(Id(self.idgen.fetch_add(1, Ordering::Relaxed)))
-	}
+    /// Attempt to increase the number of parts by one.
+    /// This can fail if it would result in more parts than the maximum capacity.
+    pub fn add_part(&self) -> Result<Id> {
+        let mut cap = self.capacity.lock();
+        if cap.parts >= self.maximum {
+            return Err(Error::NoCapacity);
+        }
+        cap.parts += 1;
+        Ok(Id(self.idgen.fetch_add(1, Ordering::Relaxed)))
+    }
 
-	/// Remove a previously added part again.
-	pub fn remove_part(&self, _id: Id) {
-		let mut cap = self.capacity.lock();
-		if cap.parts > 0 {
-			cap.parts -= 1
-		}
-	}
+    /// Remove a previously added part again.
+    pub fn remove_part(&self, _id: Id) {
+        let mut cap = self.capacity.lock();
+        if cap.parts > 0 {
+            cap.parts -= 1
+        }
+    }
 }
-

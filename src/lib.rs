@@ -18,9 +18,11 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-#[macro_use] extern crate log;
-#[macro_use] extern crate quick_error;
+#[macro_use]
+extern crate log;
 extern crate parking_lot;
+#[macro_use]
+extern crate quick_error;
 extern crate tokio;
 
 mod algorithms;
@@ -31,4 +33,3 @@ mod limiter;
 pub use error::Error;
 pub use limited::Limited;
 pub use limiter::Limiter;
-

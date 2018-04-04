@@ -27,36 +27,35 @@ pub mod bucket;
 pub struct Id(usize);
 
 impl fmt::Display for Id {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.0)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 /// A Token represents an indexed quantity.
 pub struct Token {
-	index: usize,
-	quant: usize,
+    index: usize,
+    quant: usize,
 }
 
 impl Token {
-	/// Create a new token with the given index and quantity
-	fn new(index: usize, quant: usize) -> Token {
-		Token { index, quant }
-	}
+    /// Create a new token with the given index and quantity
+    fn new(index: usize, quant: usize) -> Token {
+        Token { index, quant }
+    }
 
-	/// Get this token's quantity.
-	pub fn get(&self) -> usize {
-		self.quant
-	}
+    /// Get this token's quantity.
+    pub fn get(&self) -> usize {
+        self.quant
+    }
 
-	/// Reduce this token's quantity to the given value.
-	///
-	/// If the argument is greater than or equal to the current quantity,
-	/// this will be a no-op.
-	pub fn set(&mut self, q: usize) {
-		if q < self.quant {
-			self.quant = q
-		}
-	}
+    /// Reduce this token's quantity to the given value.
+    ///
+    /// If the argument is greater than or equal to the current quantity,
+    /// this will be a no-op.
+    pub fn set(&mut self, q: usize) {
+        if q < self.quant {
+            self.quant = q
+        }
+    }
 }
-
