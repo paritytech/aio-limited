@@ -100,10 +100,14 @@ mod tests {
     use log::LevelFilter;
     use std::{str, thread};
     use limited::Limited;
-    use std::{io, cmp::max};
+    use std::io;
+    use std::cmp::max;
     use super::*;
-    use tokio::{self, io::{copy, read_exact}, net::{TcpListener, TcpStream}, runtime::Runtime,
-                timer::Delay};
+    use tokio;
+    use tokio::io::{copy, read_exact};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::runtime::Runtime;
+    use tokio::timer::Delay;
 
     fn echo_server(
         addr: &str,
