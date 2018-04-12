@@ -36,7 +36,7 @@ quick_error! {
             from()
         }
         NoCapacity {
-            description("no capacitty left")
+            description("no capacity left")
         }
     }
 }
