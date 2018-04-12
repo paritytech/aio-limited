@@ -65,7 +65,7 @@ impl Bucket {
 
     /// Get a `Token` which contains as quantity the number of items of
     /// the remaining capacity divided by parts.
-    pub fn get(&self, id: Id, hint: usize) -> Result<Token> {
+    pub fn get(&self, _id: Id, hint: usize) -> Result<Token> {
         let mut cap = self.capacity.lock();
 
         // no parts => always at full capacity
@@ -77,14 +77,6 @@ impl Bucket {
             0 if cap.value > 0 => 1,
             x => min(x, hint),
         };
-
-        trace!(
-            "{}: {:?}, hint = {}, quantity = {}",
-            id.0,
-            *cap,
-            hint,
-            quant
-        );
 
         if quant == 0 {
             return Err(Error::NoCapacity);
