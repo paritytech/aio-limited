@@ -80,7 +80,6 @@ fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> Result<T
         .for_each(move |_| {
             bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
             let mut tt = tasks.lock();
-            trace!("notifying {} tasks", tt.len());
             for t in tt.drain() {
                 t.1.notify()
             }
