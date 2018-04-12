@@ -49,26 +49,8 @@ impl Limiter {
         let bucket = Arc::new(Bucket::new(max));
         let clock = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(Mutex::new(HashMap::<Id, Task>::new()));
-        e.spawn(Limiter::timer(clock, bucket.clone(), tasks.clone())?)?;
+        e.spawn(timer(clock, bucket.clone(), tasks.clone())?)?;
         Ok(Limiter { bucket, tasks })
-    }
-
-    fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> Result<TimerFuture> {
-        let i = Interval::new(Instant::now(), Duration::from_secs(1))
-            .for_each(move |_| {
-                bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
-                let mut tt = tasks.lock();
-                trace!("notifying {} tasks", tt.len());
-                for t in tt.drain() {
-                    t.1.notify()
-                }
-                Ok(())
-            })
-            .map_err(|e| {
-                // TODO: Restart on error
-                error!("interval error: {}", e)
-            });
-        Ok(Box::new(i))
     }
 
     pub(crate) fn get(&self, id: Id, hint: usize) -> Result<Token> {
@@ -91,6 +73,24 @@ impl Limiter {
         self.tasks.lock().remove(&id);
         self.bucket.remove_part(id)
     }
+}
+
+fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> Result<TimerFuture> {
+    let i = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
+            let mut tt = tasks.lock();
+            trace!("notifying {} tasks", tt.len());
+            for t in tt.drain() {
+                t.1.notify()
+            }
+            Ok(())
+        })
+        .map_err(|e| {
+            // TODO: Restart on error
+            error!("interval error: {}", e)
+        });
+    Ok(Box::new(i))
 }
 
 #[cfg(test)]
