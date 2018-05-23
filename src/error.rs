@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 use std::io;
-use tokio::executor::SpawnError;
+use tokio_executor::SpawnError;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 

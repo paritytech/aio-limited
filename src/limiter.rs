@@ -18,21 +18,16 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use algorithms::{Id, Token};
-use algorithms::bucket::Bucket;
+use algorithms::{bucket::Bucket, Id, Token};
 use error::Result;
+use futures::{prelude::*, task::{self, Task}};
 use parking_lot::Mutex;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{collections::HashMap, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 use std::time::{Duration, Instant};
-use tokio::executor::Executor;
-use tokio::prelude::*;
-use tokio::prelude::task::Task;
-use tokio::timer::Interval;
+use tokio_executor::Executor;
+use tokio_timer::Interval;
 
 type Tasks = Arc<Mutex<HashMap<Id, Task>>>;
-type TimerFuture = Box<Future<Item = (), Error = ()> + Send>;
 
 /// A `Limiter` maintains rate-limiting invariants over a set
 /// of `Limited` resources.
@@ -49,7 +44,7 @@ impl Limiter {
         let bucket = Arc::new(Bucket::new(max));
         let clock = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(Mutex::new(HashMap::<Id, Task>::new()));
-        e.spawn(timer(clock, bucket.clone(), tasks.clone())?)?;
+        e.spawn(Box::new(timer(clock, bucket.clone(), tasks.clone())))?;
         Ok(Limiter { bucket, tasks })
     }
 
@@ -75,8 +70,8 @@ impl Limiter {
     }
 }
 
-fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> Result<TimerFuture> {
-    let i = Interval::new(Instant::now(), Duration::from_secs(1))
+fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> impl Future<Item=(), Error=()> {
+    Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
             let mut tt = tasks.lock();
@@ -88,8 +83,7 @@ fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> Result<T
         .map_err(|e| {
             // TODO: Restart on error
             error!("interval error: {}", e)
-        });
-    Ok(Box::new(i))
+        })
 }
 
 #[cfg(test)]
@@ -97,16 +91,17 @@ mod tests {
     extern crate env_logger;
 
     use log::LevelFilter;
-    use std::{str, thread};
+    use std::{cmp::max, io, str, thread};
     use limited::Limited;
-    use std::io;
-    use std::cmp::max;
     use super::*;
-    use tokio;
-    use tokio::io::{copy, read_exact};
-    use tokio::net::{TcpListener, TcpStream};
-    use tokio::runtime::Runtime;
-    use tokio::timer::Delay;
+    use tokio::{
+        self,
+        io::{copy, read_exact},
+        net::{TcpListener, TcpStream},
+        prelude::*,
+        runtime::Runtime,
+        timer::Delay
+    };
 
     fn echo_server(
         addr: &str,

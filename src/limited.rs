@@ -19,11 +19,11 @@
 // DEALINGS IN THE SOFTWARE.
 
 use algorithms::Id;
+use futures::prelude::*;
 use error::{Error, Result};
 use limiter::Limiter;
-use std::cmp::min;
-use std::io;
-use tokio::prelude::*;
+use std::{cmp::min, io};
+use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A rate-limited resource.
 pub struct Limited<T> {
