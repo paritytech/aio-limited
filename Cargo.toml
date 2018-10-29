@@ -2,10 +2,14 @@
 name = "aio-limited"
 version = "0.1.0"
 authors = ["Parity Technologies <admin@parity.io>"]
+license = "Apache-2.0 OR MIT"
+description = "Rate-limited async I/O."
+repository = "https://github.com/paritytech/aio-limited"
+readme = "README.md"
 
 [dependencies]
 futures = "0.1"
-log = ">= 0.4"
+log = "0.4"
 quick-error= "1"
 parking_lot = "0.5"
 tokio-executor = "0.1"
