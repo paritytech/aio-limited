@@ -61,7 +61,7 @@ impl<T: AsyncRead> io::Read for Limited<T> {
                 }
             }
             Err(Error::NoCapacity) => {
-                self.lim.enqueue(self.id);
+                self.lim.enqueue(self.id).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
                 Err(io::Error::new(io::ErrorKind::WouldBlock, "rate limited"))
             }
             Err(Error::Io(e)) => Err(e),
@@ -88,7 +88,7 @@ impl<T: io::Write> io::Write for Limited<T> {
                 }
             }
             Err(Error::NoCapacity) => {
-                self.lim.enqueue(self.id);
+                self.lim.enqueue(self.id).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
                 Err(io::Error::new(io::ErrorKind::WouldBlock, "rate limited"))
             }
             Err(Error::Io(e)) => Err(e),
