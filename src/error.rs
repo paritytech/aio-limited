@@ -38,5 +38,8 @@ quick_error! {
         NoCapacity {
             description("no capacity left")
         }
+        TimerError {
+            description("error executing background timer")
+        }
     }
 }

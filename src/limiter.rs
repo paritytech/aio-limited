@@ -19,10 +19,10 @@
 // DEALINGS IN THE SOFTWARE.
 
 use algorithms::{bucket::Bucket, Id, Token};
-use error::Result;
+use error::{Error, Result};
 use futures::{prelude::*, task::{self, Task}};
 use parking_lot::Mutex;
-use std::{collections::HashMap, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
+use std::{collections::HashMap, sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc}};
 use std::time::{Duration, Instant};
 use tokio_executor::Executor;
 use tokio_timer::Interval;
@@ -35,6 +35,7 @@ type Tasks = Arc<Mutex<HashMap<Id, Task>>>;
 pub struct Limiter {
     bucket: Arc<Bucket>,
     tasks: Tasks,
+    error: Arc<AtomicBool>
 }
 
 impl Limiter {
@@ -44,11 +45,33 @@ impl Limiter {
         let bucket = Arc::new(Bucket::new(max));
         let clock = Arc::new(AtomicUsize::new(0));
         let tasks = Arc::new(Mutex::new(HashMap::<Id, Task>::new()));
-        e.spawn(Box::new(timer(clock, bucket.clone(), tasks.clone())))?;
-        Ok(Limiter { bucket, tasks })
+        let error = Arc::new(AtomicBool::new(false));
+        let limiter = Limiter {
+            bucket: bucket.clone(),
+            tasks: tasks.clone(),
+            error: error.clone()
+        };
+        let timer = Interval::new(Instant::now(), Duration::from_secs(1))
+            .for_each(move |_| {
+                bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
+                let mut tt = tasks.lock();
+                for t in tt.drain() {
+                    t.1.notify()
+                }
+                Ok(())
+            })
+            .map_err(move |e| {
+                error!("interval error: {}", e);
+                error.store(true, Ordering::Release)
+            });
+        e.spawn(Box::new(timer))?;
+        Ok(limiter)
     }
 
     pub(crate) fn get(&self, id: Id, hint: usize) -> Result<Token> {
+        if self.error.load(Ordering::Acquire) {
+            return Err(Error::TimerError)
+        }
         self.bucket.get(id, hint)
     }
 
@@ -56,11 +79,18 @@ impl Limiter {
         self.bucket.release(t)
     }
 
-    pub(crate) fn enqueue(&self, id: Id) {
+    pub(crate) fn enqueue(&self, id: Id) -> Result<()> {
+        if self.error.load(Ordering::Acquire) {
+            return Err(Error::TimerError)
+        }
         self.tasks.lock().insert(id, task::current());
+        Ok(())
     }
 
     pub(crate) fn register(&self) -> Result<Id> {
+        if self.error.load(Ordering::Acquire) {
+            return Err(Error::TimerError)
+        }
         self.bucket.add_part()
     }
 
@@ -68,22 +98,6 @@ impl Limiter {
         self.tasks.lock().remove(&id);
         self.bucket.remove_part(id)
     }
-}
-
-fn timer(clock: Arc<AtomicUsize>, bucket: Arc<Bucket>, tasks: Tasks) -> impl Future<Item=(), Error=()> {
-    Interval::new(Instant::now(), Duration::from_secs(1))
-        .for_each(move |_| {
-            bucket.reset(clock.fetch_add(1, Ordering::Relaxed));
-            let mut tt = tasks.lock();
-            for t in tt.drain() {
-                t.1.notify()
-            }
-            Ok(())
-        })
-        .map_err(|e| {
-            // TODO: Restart on error
-            error!("interval error: {}", e)
-        })
 }
 
 #[cfg(test)]
