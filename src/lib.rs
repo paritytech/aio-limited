@@ -19,11 +19,8 @@
 // DEALINGS IN THE SOFTWARE.
 
 extern crate futures;
-#[macro_use]
 extern crate log;
 extern crate parking_lot;
-#[macro_use]
-extern crate quick_error;
 extern crate tokio_executor;
 extern crate tokio_io;
 extern crate tokio_timer;
