@@ -24,7 +24,7 @@ type Tasks = Arc<Mutex<HashMap<Id, Task>>>;
 
 /// A `Limiter` maintains rate-limiting invariants over a set
 /// of `Limited` resources.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Limiter {
     bucket: Arc<Bucket>,
     tasks: Tasks,
@@ -99,7 +99,7 @@ mod tests {
 
     use log::{info, LevelFilter};
     use std::{cmp::max, io, str, thread};
-    use limited::Limited;
+    use crate::limited::Limited;
     use super::*;
     use tokio::{
         self,

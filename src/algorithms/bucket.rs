@@ -24,6 +24,8 @@ use std::{cmp::min, sync::atomic::{AtomicUsize, Ordering}};
 ///
 // TODO: In order to avoid continuous slowdown in the rate limiter itself,
 // track usage per part and remove stale parts if necessary.
+
+#[derive(Debug)]
 pub struct Bucket {
     maximum: usize, // maximum capacity
     idgen: AtomicUsize, // id generator

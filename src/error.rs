@@ -8,31 +8,53 @@
 // at https://www.apache.org/licenses/LICENSE-2.0 and a copy of the MIT license
 // at https://opensource.org/licenses/MIT.
 
-use quick_error::quick_error;
-use std::io;
+use std::{fmt, io};
 use tokio_executor::SpawnError;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-quick_error! {
-    #[derive(Debug)]
-    pub enum Error {
-        Io(e: io::Error) {
-            cause(e)
-            display("i/o error: {}", e)
-            from()
+#[derive(Debug)]
+pub enum Error {
+    Io(io::Error),
+    Exec(SpawnError),
+    NoCapacity,
+    TimerError,
+
+    #[doc(hidden)]
+    __Nonexhaustive
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Io(e) => write!(f, "i/o error: {}", e),
+            Error::Exec(e) => write!(f, "spawn error: {}", e),
+            Error::NoCapacity => f.write_str("no capacity left"),
+            Error::TimerError => f.write_str("error executing background timer"),
+            Error::__Nonexhaustive => f.write_str("__Nonexhaustive")
         }
-        Exec(e: SpawnError) {
-            display("spawn error: {:?}", e)
-            from()
+    }
+}
+
+impl std::error::Error for Error {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        match self {
+            Error::Io(e) => Some(e),
+            Error::Exec(e) => Some(e),
+            _ => None
         }
-        NoCapacity {
-            description("no capacity left")
-        }
-        TimerError {
-            description("error executing background timer")
-        }
-        #[doc(hidden)]
-        __Nonexhaustive
+    }
+}
+
+
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Self {
+        Error::Io(e)
+    }
+}
+
+impl From<SpawnError> for Error {
+    fn from(e: SpawnError) -> Self {
+        Error::Exec(e)
     }
 }

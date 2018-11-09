@@ -14,6 +14,7 @@ use std::{cmp::min, io};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A rate-limited resource.
+#[derive(Clone, Debug)]
 pub struct Limited<T> {
     id: Id,
     io: T,

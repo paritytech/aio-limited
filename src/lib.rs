@@ -11,7 +11,6 @@
 extern crate futures;
 extern crate log;
 extern crate parking_lot;
-extern crate quick_error;
 extern crate tokio_executor;
 extern crate tokio_io;
 extern crate tokio_timer;
