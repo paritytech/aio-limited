@@ -19,11 +19,15 @@
 // DEALINGS IN THE SOFTWARE.
 
 use algorithms::{bucket::Bucket, Id, Token};
-use error::{Error, Result};
+use crate::error::{Error, Result};
 use futures::{prelude::*, task::{self, Task}};
+use log::error;
 use parking_lot::Mutex;
-use std::{collections::HashMap, sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc}};
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    sync::{atomic::{AtomicBool, AtomicUsize, Ordering}, Arc},
+    time::{Duration, Instant}
+};
 use tokio_executor::Executor;
 use tokio_timer::Interval;
 
@@ -31,7 +35,7 @@ type Tasks = Arc<Mutex<HashMap<Id, Task>>>;
 
 /// A `Limiter` maintains rate-limiting invariants over a set
 /// of `Limited` resources.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Limiter {
     bucket: Arc<Bucket>,
     tasks: Tasks,
@@ -104,9 +108,9 @@ impl Limiter {
 mod tests {
     extern crate env_logger;
 
-    use log::LevelFilter;
+    use log::{info, LevelFilter};
     use std::{cmp::max, io, str, thread};
-    use limited::Limited;
+    use crate::limited::Limited;
     use super::*;
     use tokio::{
         self,

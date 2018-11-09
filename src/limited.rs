@@ -18,14 +18,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use algorithms::Id;
+use crate::{
+    algorithms::Id,
+    error::{Error, Result},
+    limiter::Limiter
+};
 use futures::prelude::*;
-use error::{Error, Result};
-use limiter::Limiter;
 use std::{cmp::min, io};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 /// A rate-limited resource.
+#[derive(Clone, Debug)]
 pub struct Limited<T> {
     id: Id,
     io: T,

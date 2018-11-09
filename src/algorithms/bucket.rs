@@ -18,11 +18,12 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-use error::{Error, Result};
+use crate::{
+    algorithms::{Id, Token},
+    error::{Error, Result}
+};
 use parking_lot::Mutex;
-use std::cmp::min;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use super::{Id, Token};
+use std::{cmp::min, sync::atomic::{AtomicUsize, Ordering}};
 
 /// A bucket has a certain capacity which is made available as `Token`s
 /// containing quantities equal to capacity divided by parts.
@@ -36,6 +37,7 @@ use super::{Id, Token};
 ///
 /// TODO: In order to avoid continuous slowdown in the rate limiter itself,
 /// track usage per part and remove stale parts if necessary.
+#[derive(Debug)]
 pub struct Bucket {
     maximum: usize,     // maximum capacity
     idgen: AtomicUsize, // id generator
