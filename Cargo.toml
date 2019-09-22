@@ -6,6 +6,7 @@ license = "Apache-2.0 OR MIT"
 description = "Rate-limited async I/O."
 repository = "https://github.com/paritytech/aio-limited"
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
 futures = "0.1"
