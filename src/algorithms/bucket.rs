@@ -9,7 +9,7 @@
 // at https://opensource.org/licenses/MIT.
 
 use crate::{algorithms::{Id, Token}, error::{Error, Result}};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, lock_api::MutexGuard};
 use std::{cmp::min, sync::atomic::{AtomicUsize, Ordering}};
 
 /// A bucket has a certain capacity which is made available as `Token`s
@@ -73,7 +73,7 @@ impl Bucket {
 
         cap.value -= quant;
         let t = Token::new(cap.index, quant);
-        cap.unlock_fair();
+        MutexGuard::unlock_fair(cap);
         Ok(t)
     }
 

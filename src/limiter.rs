@@ -114,7 +114,7 @@ mod tests {
         addr: &str,
         lr: Option<Limiter>,
         lw: Limiter,
-    ) -> Box<Future<Item = (), Error = ()> + Send> {
+    ) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let srv = TcpListener::bind(&addr.parse().unwrap())
             .unwrap()
             .incoming()
@@ -123,9 +123,9 @@ mod tests {
                 let (r, w) = s.split();
                 let reader = match lr {
                     Some(ref lim) => {
-                        Box::new(Limited::new(r, lim.clone()).unwrap()) as Box<AsyncRead + Send>
+                        Box::new(Limited::new(r, lim.clone()).unwrap()) as Box<dyn AsyncRead + Send>
                     }
-                    None => Box::new(r) as Box<AsyncRead + Send>,
+                    None => Box::new(r) as Box<dyn AsyncRead + Send>,
                 };
                 let writer = Limited::new(w, lw.clone()).unwrap();
                 let future = copy(reader, writer)
@@ -136,7 +136,7 @@ mod tests {
         Box::new(srv)
     }
 
-    fn echo_client(addr: &str) -> Box<Future<Item = (), Error = ()> + Send> {
+    fn echo_client(addr: &str) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let clt = TcpStream::connect(&addr.parse().unwrap())
             .and_then(|stream| copy(&b"0123456789"[..], stream))
             .and_then(|(n, _, stream)| read_exact(stream, vec![0; n as usize]))
@@ -145,7 +145,7 @@ mod tests {
         Box::new(clt)
     }
 
-    fn echo_rate_client(addr: &str, size: usize) -> Box<Future<Item = (), Error = ()> + Send> {
+    fn echo_rate_client(addr: &str, size: usize) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let clt = TcpStream::connect(&addr.parse().unwrap())
             .and_then(move |stream| {
                 Delay::new(Instant::now() + Duration::from_secs(1)).then(|_| Ok(stream))

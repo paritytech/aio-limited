@@ -8,16 +8,6 @@
 // at https://www.apache.org/licenses/LICENSE-2.0 and a copy of the MIT license
 // at https://opensource.org/licenses/MIT.
 
-extern crate futures;
-extern crate log;
-extern crate parking_lot;
-extern crate tokio_executor;
-extern crate tokio_io;
-extern crate tokio_timer;
-
-#[cfg(test)]
-extern crate tokio;
-
 mod algorithms;
 mod error;
 mod limited;
